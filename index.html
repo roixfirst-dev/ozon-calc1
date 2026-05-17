@@ -190,7 +190,6 @@
     const LAST_MILE = 25;
     const $ = (id) => document.getElementById(id);
     
-    // Переключено на стабильный CORS прокси-сервер, разрешающий POST-методы
     const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
     const state = {
@@ -611,7 +610,6 @@
             const rub = Number(p.price ?? p.marketing_price ?? p.old_price ?? 0);
             if (rub > 0) priceByPid.set(pid, rub);
             
-            // Вытаскиваем точные реальные комиссии из API Ozon
             if (row.commissions) {
               commissionsByPid.set(pid, {
                 fbo: row.commissions.sales_percent_fbo ?? row.commissions.sales_commission_fbo,
@@ -678,7 +676,6 @@
       const testPrice = Number(localStorage.getItem('test_price_' + offerId)) || Number(document.querySelector('[data-test-price="' + offerId + '"]')?.value) || p.price;
       const purchase = Number(localStorage.getItem('sub_cost_' + offerId)) || Number(document.querySelector('[data-cost="' + offerId + '"]')?.value) || 0;
       
-      // Настоящие динамические комиссии подставляются вместо фиксированных 15/20%
       const tariff = defaultTariff(vol, scheme, testPrice, p.fbo_comm, p.fbs_comm);
       
       const r = computeEconomics({
