@@ -792,7 +792,7 @@
         setStatus(false);
         showAuthError('Ошибка подключения к API: ' + (e?.message || e));
         await loadAssortment();
-      } finaly {
+      } finally {
         $('btnConnect').disabled = false;
       }
     }
