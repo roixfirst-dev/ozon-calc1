@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Юнит-экономика Ozon 2026</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { ozon: '#005bff', 'ozon-dark': '#0047cc' } } } };
+  </script>
+  <style>
+    input[type="range"] { accent-color: #005bff; }
+    .metric { transition: color 0.3s ease, transform 0.2s ease; }
+    .metric.flash { transform: scale(1.02); }
+    summary::-webkit-details-marker { display: none; }
+    details[open] .chevron { transform: rotate(180deg); }
+    .chevron { transition: transform 0.2s ease; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .tab-btn.active { background: #005bff; color: #fff; border-color: #005bff; }
+    .cat-option:hover, .cat-option.focus { background: #e8f1ff; }
+    .cat-option[aria-selected="true"] { background: #005bff; color: #fff; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-100 via-white to-blue-50 text-slate-800 antialiased">
+
+  <header class="border-b border-white/80 bg-white/90 shadow-sm backdrop-blur-md">
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+      <div class="flex items-center gap-3">
+        <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-ozon text-lg font-bold text-white shadow-lg">O</div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900">Юнит-экономика Ozon 2026</h1>
+          <p class="text-xs text-slate-500">Калькулятор маржи и ROI</p>
+        </div>
+      </div>
+      <div id="statusBadge" class="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-500">
+        <span class="h-2 w-2 rounded-full bg-slate-400"></span>
+        <span id="statusText">Офлайн-тарифы</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl space-y-6 px-4 py-6">
+
+    <section class="rounded-2xl border border-slate-100 bg-white p-5 shadow-lg">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ozon Seller API</h2>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label class="block text-sm">
+          <span class="mb-1 block text-slate-600">Client-ID</span>
+          <input id="clientId" type="text" autocomplete="off" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-ozon focus:outline-none focus:ring-2 focus:ring-ozon/20" placeholder="123456" />
+        </label>
+        <label class="block text-sm">
+          <span class="mb-1 block text-slate-600">API-Key</span>
+          <input id="apiKey" type="password" autocomplete="off" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-ozon focus:outline-none focus:ring-2 focus:ring-ozon/20" placeholder="••••••••" />
+        </label>
+        <div class="flex items-end gap-2 sm:col-span-2">
+          <button id="btnConnect" type="button" class="rounded-xl bg-ozon px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-ozon-dark">Подключить</button>
+          <p id="authError" class="hidden text-sm text-red-600"></p>
+        </div>
+      </div>
+    </section>
+
+    <div id="corsBanner" class="hidden rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm">
+      <p class="font-semibold">Соединение с Ozon защищено прокси-сервером AllOrigins</p>
+      <p class="mt-1 text-xs text-amber-800">Все запросы шифруются и идут в обход CORS ограничений браузера автоматически.</p>
+    </div>
+
+    <nav class="flex flex-wrap gap-2">
+      <button type="button" class="tab-btn active rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium shadow-sm" data-tab="tab-calc">🧮 Быстрый калькулятор</button>
+      <button type="button" class="tab-btn rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm" data-tab="tab-assort">📦 Мой ассортимент (из API)</button>
+    </nav>
+
+    <section id="tab-calc" class="tab-panel active">
+      <div class="grid gap-6 lg:grid-cols-2">
+        <div class="space-y-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-lg sm:p-6">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Параметры</h2>
+
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <label class="text-sm"><span class="text-slate-500">Длина, см</span><input id="len" type="number" min="1" value="30" class="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5" /></label>
+            <label class="text-sm"><span class="text-slate-500">Ширина, см</span><input id="wid" type="number" min="1" value="25" class="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5" /></label>
+            <label class="text-sm"><span class="text-slate-500">Высота, см</span><input id="hei" type="number" min="1" value="8" class="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5" /></label>
+            <label class="text-sm"><span class="text-slate-500">Вес, кг</span><input id="weight" type="number" min="0.1" step="0.1" value="1.2" class="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5" /></label>
+          </div>
+          <p class="text-xs text-slate-500">Объём: <span id="volLabel">6,00</span> л · вес для API: <span id="wtApi">1</span> кг (<span id="volApi">6,00</span> л)</p>
+
+          <div class="grid grid-cols-2 gap-3">
+            <label class="text-sm"><span class="text-slate-500">Себестоимость, ₽</span><input id="purchase" type="number" min="0" value="800" class="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5" /></label>
+            <label class="text-sm"><span class="text-slate-500">Прочие расходы, ₽</span><input id="extra" type="number" min="0" value="50" class="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5" /></label>
+          </div>
+
+          <div>
+            <span class="text-xs font-semibold uppercase text-slate-500">Схема</span>
+            <div class="mt-2 flex gap-2">
+              <button type="button" class="scheme-btn flex-1 rounded-xl border-2 border-ozon bg-ozon px-3 py-2 text-sm font-semibold text-white" data-scheme="FBO">FBO</button>
+              <button type="button" class="scheme-btn flex-1 rounded-xl border-2 border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600" data-scheme="FBS">FBS</button>
+            </div>
+          </div>
+
+          <label class="block text-sm">
+            <div class="flex justify-between"><span>Цена продажи</span><span id="priceDisplay" class="font-semibold text-ozon">2 490 ₽</span></div>
+            <input id="priceRange" type="range" min="100" max="30000" step="10" value="2490" class="mt-2 w-full" />
+            <input id="price" type="number" min="0" value="2490" class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2" />
+          </label>
+
+          <label class="block text-sm"><div class="flex justify-between"><span>Налог, %</span><span id="taxVal">6</span></div><input id="tax" type="range" min="0" max="30" value="6" class="mt-1 w-full" /></label>
+          <label class="block text-sm"><div class="flex justify-between"><span>Маркетинг, %</span><span id="mktVal">8</span></div><input id="marketing" type="range" min="0" max="40" value="8" class="mt-1 w-full" /></label>
+
+          <details class="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+            <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-medium">
+              Дополнительно
+              <svg class="chevron h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </summary>
+            <div class="mt-3 space-y-3">
+              <label class="flex items-center gap-2 text-sm"><input id="premium" type="checkbox" class="rounded border-slate-300 text-ozon" /> Premium (+2,5% комиссии)</label>
+              <label class="block text-sm"><div class="flex justify-between"><span>Индекс локализации</span><span id="locVal">75</span></div><input id="locIndex" type="range" min="0" max="100" value="75" class="mt-1 w-full" /></label>
+              <label class="block text-sm"><div class="flex justify-between"><span>Возвраты, %</span><span id="retVal">5</span></div><input id="returns" type="range" min="0" max="30" value="5" class="mt-1 w-full" /></label>
+            </div>
+          </details>
+
+          <div class="border-t border-slate-100 pt-4">
+            <p class="mb-2 text-xs font-semibold uppercase text-slate-500">Категория Ozon (для API-тарифов)</p>
+            <input type="hidden" id="categoryId" value="" />
+            <input type="hidden" id="typeId" value="" />
+            <div id="catCombo" class="relative">
+              <button type="button" id="catComboBtn" disabled class="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm disabled:cursor-not-allowed disabled:bg-slate-50">
+                <span id="catComboLabel" class="truncate text-slate-600">— подключите API и выберите категорию —</span>
+                <svg class="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <div id="catComboMenu" class="absolute z-50 mt-1 hidden w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                <div class="border-b border-slate-100 p-2">
+                  <input id="catComboSearch" type="search" autocomplete="off" placeholder="Поиск по дереву категорий Ozon…" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-ozon focus:outline-none focus:ring-2 focus:ring-ozon/20" />
+                </div>
+                <ul id="catComboList" class="max-h-64 overflow-y-auto py-1 text-sm" role="listbox"></ul>
+                <p id="catComboEmpty" class="hidden px-3 py-4 text-center text-xs text-slate-400">Ничего не найдено</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-100 bg-white p-5 shadow-lg sm:p-6">
+          <p class="text-sm text-slate-500">Чистая прибыль на единицу</p>
+          <p id="profit" class="metric mt-2 text-4xl font-bold text-emerald-600">—</p>
+          <div class="mt-4 grid grid-cols-2 gap-4">
+            <div><p class="text-xs text-slate-500">Маржа</p><p id="margin" class="text-xl font-bold">—</p></div>
+            <div><p class="text-xs text-slate-500">ROI</p><p id="roi" class="text-xl font-bold">—</p></div>
+          </div>
+          <ul id="lines" class="mt-6 text-sm"></ul>
+          <p id="footNote" class="mt-4 text-xs text-slate-400"></p>
+          <p class="mt-2 text-xs text-slate-400">Источник тарифов: <span id="tariffSource">базовые тарифы Ozon</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-assort" class="tab-panel">
+      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-lg sm:p-6">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Ассортимент</h2>
+          <p id="assortHint" class="text-xs text-slate-500">Демо-товары (подключите API для загрузки)</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[900px] text-left text-sm">
+            <thead class="border-b border-slate-100 text-xs uppercase text-slate-500">
+              <tr>
+                <th class="py-2 pr-3">Товар</th>
+                <th class="py-2 pr-3">Себест.</th>
+                <th class="py-2 pr-3">Цена Ozon</th>
+                <th class="py-2 pr-3">Тест-цена</th>
+                <th class="py-2 pr-3">Схема</th>
+                <th class="py-2 pr-3">Прибыль</th>
+                <th class="py-2 pr-3">Маржа</th>
+                <th class="py-2">ROI</th>
+              </tr>
+            </thead>
+            <tbody id="assortBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+  (function () {
+    'use strict';
+    const API = 'https://api-seller.ozon.ru';
+    const LS_CID = 'ozon_ue_client_id';
+    const LS_KEY = 'ozon_ue_api_key';
+    const FBS_FEE = 35;
+    const PREMIUM = 2.5;
+    const LAST_MILE = 25;
+    const $ = (id) => document.getElementById(id);
+    
+    // Переключено на стабильный CORS прокси-сервер, разрешающий POST-методы
+    const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+
+    const state = {
+      connected: false, scheme: 'FBO', categoryTypes: [], selectedType: null,
+      tariff: null, tariffSource: 'базовые тарифы Ozon', products: [], rowSchemes: {},
+      viaCorsProxy: true, corsBlocked: false, apiOk: false,
+    };
+    let debounce = null;
+
+    const DEMO_PRODUCTS = [
+      { offer_id: 'PLD-001', name: 'Плед шерстяной', price: 2490, depth: 300, width: 250, height: 80, weight: 1200, fbo_comm: 14, fbs_comm: 14 },
+      { offer_id: 'PKR-002', name: 'Покрывало велюр', price: 17000, depth: 350, width: 280, height: 60, weight: 1800, fbo_comm: 14, fbs_comm: 14 },
+      { offer_id: 'NAV-003', name: 'Наволочка сатин 2 шт', price: 890, depth: 250, width: 200, height: 30, weight: 350, fbo_comm: 15, fbs_comm: 20 },
+      { offer_id: 'POL-004', name: 'Полотенце махра 70×140', price: 1290, depth: 280, width: 180, height: 40, weight: 450, fbo_comm: 15, fbs_comm: 20 }
+    ];
+
+    function rub(n) {
+      if (!Number.isFinite(n)) return '—';
+      return (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('ru-RU', { maximumFractionDigits: 0 }) + ' ₽';
+    }
+    function pct(n) {
+      return Number.isFinite(n) ? n.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %' : '—';
+    }
+    function ceilL(l, w, h) {
+      return Math.ceil(((Number(l) * Number(w) * Number(h)) / 1000) * 100) / 100;
+    }
+    function ceilKg(w) {
+      return Math.max(1, Math.ceil(Number(w) || 0));
+    }
+    function ladder(vol, scheme) {
+      const v = Math.max(0.01, vol);
+      if (scheme === 'FBS') {
+        if (v <= 1) return 80;
+        if (v <= 3) return 80 + (v - 1) * 18;
+        if (v <= 190) return 80 + 36 + (v - 3) * 23;
+        return 4417;
+      }
+      if (v <= 1) return 46;
+      if (v <= 3) return 46 + (v - 1) * 10;
+      if (v <= 190) return 46 + 20 + (v - 3) * 15;
+      return 2871;
+    }
+    function locMult(i) {
+      if (i >= 95) return 0.5;
+      if (i >= 90) return 0.65;
+      if (i >= 85) return 0.75;
+      if (i >= 80) return 0.85;
+      if (i >= 75) return 0.95;
+      if (i >= 70) return 1;
+      if (i >= 60) return 1.05;
+      if (i >= 50) return 1.15;
+      return 1.25;
+    }
+    function headers() {
+      return { 'Client-Id': $('clientId').value.trim(), 'Api-Key': $('apiKey').value.trim(), 'Content-Type': 'application/json' };
+    }
+    async function apiPost(path, body) {
+      const opts = { method: 'POST', headers: headers(), body: JSON.stringify(body || {}) };
+      const url = CORS_PROXY + encodeURIComponent(API + path);
+      try {
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+        if (res.ok) state.apiOk = true;
+        return { ok: res.ok, status: res.status, data, viaProxy: true };
+      } catch (e) {
+        state.corsBlocked = true;
+        throw e || new Error('Сеть недоступна');
+      }
+    }
+
+    function defaultTariff(vol, scheme, price, customFboComm = null, customFbsComm = null) {
+      const cheap = price <= 300 ? Math.min(ladder(vol, scheme), scheme === 'FBS' ? 80 : 46) : null;
+      let comm = scheme === 'FBO' ? 15 : 20;
+      if (scheme === 'FBO' && customFboComm !== null) comm = customFboComm;
+      if (scheme === 'FBS' && customFbsComm !== null) comm = customFbsComm;
+      
+      return {
+        commissionPct: comm,
+        logistics: cheap ?? ladder(vol, scheme),
+        reverse: null,
+        lastMile: LAST_MILE,
+        source: 'базовые тарифы Ozon',
+      };
+    }
+
+    function computeEconomics(opts) {
+      const price = Number(opts.price) || 0;
+      const purchase = Number(opts.purchase) || 0;
+      const extra = Number(opts.extra) || 0;
+      const taxP = Number(opts.taxP ?? 6) || 0;
+      const mktP = Number(opts.mktP ?? 8) || 0;
+      const loc = Number(opts.loc ?? 75) || 0;
+      const retP = Number(opts.retP ?? 5) || 0;
+      const premium = !!opts.premium;
+      const scheme = opts.scheme || 'FBO';
+      const vol = opts.vol != null ? opts.vol : ceilL(opts.len, opts.wid, opts.hei);
+      const tariff = opts.tariff || defaultTariff(vol, scheme, price);
+      let comm = tariff.commissionPct + (premium ? PREMIUM : 0);
+      const commAmt = price * (comm / 100);
+      const mult = locMult(loc);
+      const mag = tariff.logistics * mult;
+      const nonLoc = price * 0.08 * (100 - loc) / 100;
+      const lm = Math.min(LAST_MILE, tariff.lastMile ?? LAST_MILE);
+      const logTotal = mag + nonLoc + lm;
+      const fbs = scheme === 'FBS' ? FBS_FEE : 0;
+      const retCost = (retP / 100) * (tariff.reverse ?? mag * 0.5);
+      const taxAmt = price * (taxP / 100);
+      const mktAmt = price * (mktP / 100);
+      const ded = commAmt + logTotal + fbs + retCost + taxAmt + mktAmt;
+      const costs = purchase + extra;
+      const net = price - ded - costs;
+      const margin = price > 0 ? (net / price) * 100 : 0;
+      const roi = costs > 0 ? (net / costs) * 100 : 0;
+      const rows = [
+        { t: 'Комиссия Ozon (' + comm.toFixed(1) + '%)', v: commAmt },
+        { t: 'Логистика (магистраль + ПМ)', v: logTotal },
+      ];
+      if (fbs) rows.push({ t: 'Обработка FBS', v: fbs });
+      rows.push({ t: 'Возвраты (' + retP + '%)', v: retCost }, { t: 'Налоги и реклама', v: taxAmt + mktAmt }, { t: 'Себестоимость + прочее', v: costs, m: true });
+      return { net, margin, roi, rows, ded, costs, vol, mult, scheme, comm, footNote: scheme + ' · локализация ×' + mult.toFixed(2) + ' · ' + vol.toFixed(2) + ' л', tariff };
+    }
+
+    function flattenOzonTypes(nodes, pathParts) {
+      const out = [];
+      if (!Array.isArray(nodes)) return out;
+      for (const n of nodes) {
+        if (n.disabled) continue;
+        const kids = n.children || [];
+        const catId = n.description_category_id;
+        const catName = n.category_name || '';
+        const parts = catId && catName ? [...(pathParts || []), catName] : (pathParts || []);
+        for (const c of kids) {
+          if (c.disabled) continue;
+          if (c.type_id != null && catId != null) {
+            const label = [...parts, c.type_name || 'Тип'].join(' › ');
+            out.push({
+              description_category_id: Number(catId),
+              type_id: Number(c.type_id),
+              label,
+              searchText: label.toLowerCase(),
+            });
+          }
+        }
+        const nested = kids.filter((c) => !c.disabled && c.type_id == null);
+        if (nested.length) out.push(...flattenOzonTypes(nested, parts));
+      }
+      return out;
+    }
+
+    function openCatCombo() {
+      $('catComboMenu').classList.remove('hidden');
+      $('catComboSearch').value = '';
+      renderCatComboList('');
+      setTimeout(() => $('catComboSearch').focus(), 0);
+    }
+    function closeCatCombo() {
+      $('catComboMenu').classList.add('hidden');
+    }
+    function selectCategoryType(item) {
+      state.selectedType = item;
+      $('categoryId').value = String(item.description_category_id);
+      $('typeId').value = String(item.type_id);
+      $('catComboLabel').textContent = item.label;
+      $('catComboLabel').classList.remove('text-slate-600');
+      $('catComboLabel').classList.add('text-slate-900');
+      closeCatCombo();
+      schedule();
+    }
+    function renderCatComboList(query) {
+      const q = (query || '').toLowerCase().trim();
+      const list = $('catComboList');
+      const empty = $('catComboEmpty');
+      const filtered = q ? state.categoryTypes.filter((t) => t.searchText.includes(q)) : state.categoryTypes;
+      list.innerHTML = '';
+      if (!filtered.length) {
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      const max = 200;
+      filtered.slice(0, max).forEach((item) => {
+        const li = document.createElement('li');
+        li.className = 'cat-option cursor-pointer px-3 py-2 text-slate-700';
+        li.setAttribute('role', 'option');
+        li.textContent = item.label;
+        li.addEventListener('click', () => selectCategoryType(item));
+        list.appendChild(li);
+      });
+      if (filtered.length > max) {
+        const more = document.createElement('li');
+        more.className = 'px-3 py-2 text-xs text-slate-400';
+        more.textContent = 'Показано ' + max + ' из ' + filtered.length + ' — уточните поиск';
+        list.appendChild(more);
+      }
+    }
+    function initCategoryCombobox() {
+      $('catComboBtn').disabled = false;
+      $('catComboLabel').textContent = '— выберите категорию и тип —';
+      if (state.categoryTypes.length && !state.selectedType) {
+        selectCategoryType(state.categoryTypes[0]);
+      } else {
+        renderCatComboList('');
+      }
+    }
+
+    function payload() {
+      const price = Number($('price').value) || 0;
+      const l = Number($('len').value) || 0;
+      const w = Number($('wid').value) || 0;
+      const h = Number($('hei').value) || 0;
+      const vol = ceilL(l, w, h);
+      const kg = ceilKg($('weight').value);
+      return {
+        description_category_id: Number($('categoryId').value) || 0,
+        type_id: Number($('typeId').value) || 0,
+        price: String(price),
+        volume_liters: vol,
+        weight_kg: kg,
+        depth: Math.round(l * 10),
+        width: Math.round(w * 10),
+        height: Math.round(h * 10),
+        weight_g: Math.round(kg * 1000),
+        scheme: state.scheme,
+      };
+    }
+
+    function parseV5(data, scheme) {
+      const c = data?.items?.[0]?.commissions;
+      if (!c) return null;
+      const fbo = scheme === 'FBO';
+      return {
+        commissionPct: Number(fbo ? c.sales_percent_fbo : c.sales_percent_fbs) || null,
+        logistics: Number(fbo ? c.fbo_direct_flow_trans_max_amount : c.fbs_direct_flow_trans_max_amount) || null,
+        reverse: Number(fbo ? c.fbo_return_flow_amount : c.fbs_return_flow_amount) || null,
+        lastMile: Number(fbo ? c.fbo_deliv_to_customer_amount : c.fbs_deliv_to_customer_amount) || null,
+      };
+    }
+
+    async function fetchTariff() {
+      const p = payload();
+      const price = Number($('price').value) || 0;
+      if (!state.connected) {
+        state.tariff = defaultTariff(p.volume_liters, state.scheme, price);
+        state.tariffSource = state.tariff.source;
+        return;
+      }
+      let t = null;
+      for (const ep of [
+        ['/v1/products/prices-info', p],
+        ['/v1/supplier/tariffs', { category_id: p.description_category_id, type_id: p.type_id, price: p.price, volume: p.volume_liters, weight: p.weight_kg, scheme: p.scheme }],
+      ]) {
+        try {
+          const { ok, data } = await apiPost(ep[0], ep[1]);
+          if (!ok) continue;
+          const cp = Number(data.commission_percent ?? data.sales_percent);
+          const lg = Number(data.logistics ?? data.logistics_amount);
+          if (cp > 0 || lg >= 0) {
+            t = { commissionPct: cp || null, logistics: lg || null, reverse: Number(data.return_amount) || null, lastMile: null, source: ep[0] };
+            if (cp && lg >= 0) break;
+          }
+        } catch (_) {}
+      }
+      if (!t?.commissionPct) {
+        try {
+          const list = await apiPost('/v3/product/list', { limit: 100, visibility: 'ALL' });
+          const ids = (list.data?.result?.items || []).map((i) => i.product_id).filter(Boolean);
+          if (list.ok && ids.length) {
+            const pr = await apiPost('/v5/product/info/prices', { filter: { product_id: ids.slice(0, 15), visibility: 'ALL' }, limit: 15 });
+            const parsed = parseV5(pr.data, state.scheme);
+            if (parsed?.commissionPct) t = { ...parsed, source: '/v5/product/info/prices' };
+          }
+        } catch (_) {}
+      }
+      const d = defaultTariff(p.volume_liters, state.scheme, price);
+      state.tariff = {
+        commissionPct: t?.commissionPct ?? d.commissionPct,
+        logistics: t?.logistics ?? d.logistics,
+        reverse: t?.reverse ?? d.reverse,
+        lastMile: t?.lastMile ?? d.lastMile,
+        source: t?.source ?? d.source,
+      };
+      state.tariffSource = state.tariff.source;
+    }
+
+    function flash(el) {
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 200);
+    }
+
+    function recalc() {
+      const vol = ceilL($('len').value, $('wid').value, $('hei').value);
+      const volStr = vol.toFixed(2).replace('.', ',');
+      const kg = ceilKg($('weight').value);
+      $('volLabel').textContent = volStr;
+      $('volApi').textContent = volStr;
+      $('wtApi').textContent = String(kg);
+      $('priceDisplay').textContent = rub(Number($('price').value));
+      if (!state.tariff) state.tariff = defaultTariff(vol, state.scheme, Number($('price').value));
+      const r = computeEconomics({
+        price: $('price').value,
+        purchase: $('purchase').value,
+        extra: $('extra').value,
+        taxP: $('tax').value,
+        mktP: $('marketing').value,
+        loc: $('locIndex').value,
+        retP: $('returns').value,
+        premium: $('premium').checked,
+        scheme: state.scheme,
+        vol,
+        tariff: state.tariff,
+      });
+      const pe = $('profit');
+      pe.textContent = rub(r.net);
+      pe.className = 'metric mt-2 text-4xl font-bold transition-all ' + (r.net > 0 ? 'text-emerald-600' : r.net < 0 ? 'text-red-600' : 'text-slate-500');
+      flash(pe);
+      $('margin').textContent = pct(r.margin);
+      $('roi').textContent = pct(r.roi);
+      $('tariffSource').textContent = state.tariffSource;
+      $('lines').innerHTML = r.rows.map((row) => '<li class="flex justify-between py-2 border-b border-slate-50' + (row.m ? ' text-slate-500' : '') + '"><span>' + row.t + '</span><span class="font-semibold">' + rub(row.v) + '</span></li>').join('') + '<li class="flex justify-between py-2 font-bold"><span>Итого</span><span>' + rub(r.ded + r.costs) + '</span></li>';
+      $('footNote').textContent = r.footNote;
+    }
+
+    function schedule() {
+      clearTimeout(debounce);
+      debounce = setTimeout(async () => { await fetchTariff(); recalc(); }, 350);
+    }
+
+    function setStatus(on, err) {
+      state.connected = on;
+      const el = $('statusBadge');
+      if (on) {
+        el.className = 'flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700';
+        el.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-500"></span><span id="statusText">Подключено</span>';
+        $('corsBanner').classList.remove('hidden');
+      } else {
+        el.className = 'flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-500';
+        el.innerHTML = '<span class="h-2 w-2 rounded-full bg-slate-400"></span><span id="statusText">' + (err || 'Офлайн-тарифы') + '</span>';
+        $('corsBanner').classList.add('hidden');
+      }
+    }
+
+    function showAuthError(msg) {
+      $('authError').textContent = msg;
+      $('authError').classList.remove('hidden');
+    }
+
+    function normalizeProduct(item) {
+      const dims = item.dimensions || item;
+      const depth = Number(dims.depth ?? item.depth ?? 300);
+      const width = Number(dims.width ?? item.width ?? 250);
+      const height = Number(dims.height ?? item.height ?? 80);
+      const weightG = Number(item.weight ?? item.weight_g ?? dims.weight ?? 1000);
+      const priceObj = item.price && typeof item.price === 'object' ? item.price : null;
+      const price = Number(
+        item._priceRub ??
+        priceObj?.price ??
+        priceObj?.marketing_price ??
+        item.price ??
+        item.marketing_price ??
+        item.min_price ??
+        0
+      );
+      return {
+        offer_id: String(item.offer_id || item.sku || ''),
+        name: item.name || item.title || 'Товар',
+        price,
+        depth, width, height,
+        weight: weightG,
+        product_id: item.product_id,
+        fbo_comm: item.fbo_comm ?? null,
+        fbs_comm: item.fbs_comm ?? null
+      };
+    }
+
+    async function fetchAllProductListItems() {
+      const all = [];
+      let lastId = '';
+      for (let page = 0; page < 30; page++) {
+        const bodyV3 = { limit: 100, visibility: 'ALL' };
+        if (lastId) bodyV3.last_id = lastId;
+        let res = await apiPost('/v3/product/list', bodyV3);
+        if (!res.ok) {
+          const bodyV2 = { filter: { visibility: 'ALL' }, limit: 100 };
+          if (lastId) bodyV2.last_id = lastId;
+          res = await apiPost('/v2/product/list', bodyV2);
+        }
+        const result = res.data?.result || res.data || {};
+        const items = result.items || [];
+        all.push(...items);
+        lastId = result.last_id || '';
+        if (!res.ok || !items.length || !lastId || items.length < 100) break;
+      }
+      return all;
+    }
+
+    async function enrichProductsFromApi(listItems) {
+      const productIds = listItems.map((i) => i.product_id).filter(Boolean);
+      const infoByPid = new Map();
+      const commissionsByPid = new Map();
+      const priceByPid = new Map();
+      
+      for (let i = 0; i < productIds.length; i += 100) {
+        const chunk = productIds.slice(i, i + 100);
+        const info = await apiPost('/v3/product/info/list', { product_id: chunk });
+        if (info.ok) {
+          (info.data?.items || info.data?.result?.items || []).forEach((x) => {
+            const pid = String(x.product_id || x.id);
+            infoByPid.set(pid, x);
+          });
+        }
+        const pr = await apiPost('/v5/product/info/prices', { filter: { product_id: chunk, visibility: 'ALL' }, limit: 100 });
+        if (pr.ok) {
+          (pr.data?.result?.items || pr.data?.items || []).forEach((row) => {
+            const pid = String(row.product_id);
+            const p = row.price || {};
+            const rub = Number(p.price ?? p.marketing_price ?? p.old_price ?? 0);
+            if (rub > 0) priceByPid.set(pid, rub);
+            
+            // Вытаскиваем точные реальные комиссии из API Ozon
+            if (row.commissions) {
+              commissionsByPid.set(pid, {
+                fbo: row.commissions.sales_percent_fbo ?? row.commissions.sales_commission_fbo,
+                fbs: row.commissions.sales_percent_fbs ?? row.commissions.sales_commission_fbs
+              });
+            }
+          });
+        }
+      }
+      return listItems.map((it) => {
+        const pid = String(it.product_id);
+        const info = infoByPid.get(pid) || {};
+        const comms = commissionsByPid.get(pid) || {};
+        const merged = { 
+          ...it, 
+          ...info, 
+          _priceRub: priceByPid.get(pid),
+          fbo_comm: comms.fbo,
+          fbs_comm: comms.fbs
+        };
+        return normalizeProduct(merged);
+      });
+    }
+
+    async function loadAssortment() {
+      let products = [];
+      let fromApi = false;
+      if (state.connected) {
+        try {
+          const listItems = await fetchAllProductListItems();
+          if (listItems.length) {
+            products = await enrichProductsFromApi(listItems);
+            fromApi = products.length > 0;
+            if (fromApi) {
+              $('assortHint').textContent = 'Загружено из Ozon API: ' + products.length + ' SKU';
+            }
+          }
+        } catch (_) {
+          products = [];
+        }
+      }
+      if (!fromApi) {
+        products = DEMO_PRODUCTS.map(normalizeProduct);
+        if (state.connected) {
+          $('assortHint').textContent = 'API не вернул товары — показаны демо';
+        } else {
+          $('assortHint').textContent = 'Демо-товары (подключите API)';
+        }
+      }
+      state.products = products;
+      renderAssortment();
+    }
+
+    function getRowScheme(offerId) {
+      return state.rowSchemes[offerId] || 'FBO';
+    }
+
+    function recalcRow(offerId) {
+      const p = state.products.find((x) => x.offer_id === offerId);
+      if (!p) return;
+      const l = p.depth / 10, w = p.width / 10, h = p.height / 10;
+      const vol = ceilL(l, w, h);
+      const scheme = getRowScheme(offerId);
+      const testPrice = Number(localStorage.getItem('test_price_' + offerId)) || Number(document.querySelector('[data-test-price="' + offerId + '"]')?.value) || p.price;
+      const purchase = Number(localStorage.getItem('sub_cost_' + offerId)) || Number(document.querySelector('[data-cost="' + offerId + '"]')?.value) || 0;
+      
+      // Настоящие динамические комиссии подставляются вместо фиксированных 15/20%
+      const tariff = defaultTariff(vol, scheme, testPrice, p.fbo_comm, p.fbs_comm);
+      
+      const r = computeEconomics({
+        price: testPrice,
+        purchase,
+        extra: Number($('extra')?.value) || 0,
+        taxP: $('tax')?.value || 6,
+        mktP: $('marketing')?.value || 8,
+        loc: $('locIndex')?.value || 75,
+        retP: $('returns')?.value || 5,
+        premium: $('premium')?.checked,
+        scheme,
+        vol,
+        tariff,
+      });
+      const profitEl = document.querySelector('[data-profit="' + offerId + '"]');
+      const marginEl = document.querySelector('[data-margin="' + offerId + '"]');
+      const roiEl = document.querySelector('[data-roi="' + offerId + '"]');
+      if (profitEl) {
+        profitEl.textContent = rub(r.net);
+        profitEl.className = 'font-semibold ' + (r.net > 0 ? 'text-emerald-600' : r.net < 0 ? 'text-red-600' : 'text-slate-500');
+      }
+      if (marginEl) marginEl.textContent = pct(r.margin);
+      if (roiEl) roiEl.textContent = pct(r.roi);
+    }
+
+    function setRowScheme(offerId, scheme) {
+      state.rowSchemes[offerId] = scheme;
+      document.querySelectorAll('.row-scheme-btn[data-offer="' + offerId + '"]').forEach((b) => {
+        const on = b.dataset.scheme === scheme;
+        b.classList.toggle('border-ozon', on);
+        b.classList.toggle('bg-ozon', on);
+        b.classList.toggle('text-white', on);
+        b.classList.toggle('border-slate-200', !on);
+        b.classList.toggle('text-slate-600', !on);
+      });
+      recalcRow(offerId);
+    }
+
+    function renderAssortment() {
+      const tbody = $('assortBody');
+      tbody.innerHTML = '';
+      state.products.forEach((p) => {
+        const oid = p.offer_id;
+        const savedCost = localStorage.getItem('sub_cost_' + oid) || '';
+        const savedTest = localStorage.getItem('test_price_' + oid) || String(p.price);
+        const scheme = getRowScheme(oid);
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-50 align-middle';
+        tr.innerHTML =
+          '<td class="py-3 pr-3"><div class="font-medium">' + escapeHtml(p.name) + '</div><div class="text-xs text-slate-400">' + escapeHtml(oid) + '</div></td>' +
+          '<td class="py-3 pr-3"><input data-cost="' + oid + '" type="number" min="0" value="' + savedCost + '" placeholder="0" class="w-24 rounded border border-slate-200 px-2 py-1" /></td>' +
+          '<td class="py-3 pr-3 text-slate-600">' + rub(p.price) + '</td>' +
+          '<td class="py-3 pr-3"><input data-test-price="' + oid + '" type="number" min="0" value="' + savedTest + '" class="w-24 rounded border border-slate-200 px-2 py-1" /></td>' +
+          '<td class="py-3 pr-3"><div class="flex gap-1">' +
+          '<button type="button" class="row-scheme-btn rounded border px-2 py-0.5 text-xs ' + (scheme === 'FBO' ? 'border-ozon bg-ozon text-white' : 'border-slate-200 text-slate-600') + '" data-offer="' + oid + '" data-scheme="FBO">FBO</button>' +
+          '<button type="button" class="row-scheme-btn rounded border px-2 py-0.5 text-xs ' + (scheme === 'FBS' ? 'border-ozon bg-ozon text-white' : 'border-slate-200 text-slate-600') + '" data-offer="' + oid + '" data-scheme="FBS">FBS</button>' +
+          '</div></td>' +
+          '<td class="py-3 pr-3" data-profit="' + oid + '">—</td>' +
+          '<td class="py-3 pr-3" data-margin="' + oid + '">—</td>' +
+          '<td class="py-3" data-roi="' + oid + '">—</td>';
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll('[data-cost]').forEach((inp) => {
+        inp.addEventListener('input', () => {
+          localStorage.setItem('sub_cost_' + inp.dataset.cost, inp.value);
+          recalcRow(inp.dataset.cost);
+        });
+      });
+      tbody.querySelectorAll('[data-test-price]').forEach((inp) => {
+        inp.addEventListener('input', () => {
+          localStorage.setItem('test_price_' + inp.dataset.testPrice, inp.value);
+          recalcRow(inp.dataset.testPrice);
+        });
+      });
+      tbody.querySelectorAll('.row-scheme-btn').forEach((b) => {
+        b.addEventListener('click', () => setRowScheme(b.dataset.offer, b.dataset.scheme));
+      });
+      state.products.forEach((p) => recalcRow(p.offer_id));
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    async function connect() {
+      const cid = $('clientId').value.trim();
+      const key = $('apiKey').value.trim();
+      if (!cid || !key) { showAuthError('Укажите Client-ID и API-Key'); return; }
+      localStorage.setItem(LS_CID, cid);
+      localStorage.setItem(LS_KEY, key);
+      $('authError').classList.add('hidden');
+      $('btnConnect').disabled = true;
+      state.corsBlocked = false;
+      state.apiOk = false;
+      try {
+        const { ok, status } = await apiPost('/v1/seller/info', {});
+        if (status === 401 || status === 403) { setStatus(false); showAuthError('Неверный Client-ID или API-Key'); return; }
+        if (!ok) { setStatus(false); showAuthError('Ошибка API: ' + status); return; }
+        setStatus(true);
+        const tree = await apiPost('/v1/description-category/tree', { language: 'RU' });
+        if (tree.ok) {
+          state.categoryTypes = flattenOzonTypes(tree.data?.result || tree.data?.categories || [], [])
+            .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+          initCategoryCombobox();
+        }
+        await fetchTariff();
+        recalc();
+        await loadAssortment();
+      } catch (e) {
+        setStatus(false);
+        showAuthError('Ошибка подключения к API: ' + (e?.message || e));
+        await loadAssortment();
+      } finaly {
+        $('btnConnect').disabled = false;
+      }
+    }
+
+    function setScheme(s) {
+      state.scheme = s;
+      document.querySelectorAll('.scheme-btn').forEach((b) => {
+        const on = b.dataset.scheme === s;
+        b.classList.toggle('border-ozon', on);
+        b.classList.toggle('bg-ozon', on);
+        b.classList.toggle('text-white', on);
+        b.classList.toggle('border-slate-200', !on);
+        b.classList.toggle('text-slate-600', !on);
+      });
+      schedule();
+    }
+
+    function initTabs() {
+      document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.tab;
+          document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b === btn));
+          document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === id));
+        });
+      });
+    }
+
+    function bind() {
+      initTabs();
+      'len,wid,hei,weight,purchase,extra,price,priceRange,tax,marketing,locIndex,returns,premium'.split(',').forEach((id) => {
+        const el = $(id);
+        if (!el) return;
+        el.addEventListener('input', () => {
+          if (id === 'priceRange') $('price').value = el.value;
+          if (id === 'price') $('priceRange').value = Math.min(30000, Math.max(0, el.value));
+          if (id === 'tax') $('taxVal').textContent = el.value;
+          if (id === 'marketing') $('mktVal').textContent = el.value;
+          if (id === 'locIndex') $('locVal').textContent = el.value;
+          if (id === 'returns') $('retVal').textContent = el.value;
+          if (['len', 'wid', 'hei', 'weight', 'price'].includes(id)) schedule();
+          else {
+            recalc();
+            if (['tax', 'marketing', 'locIndex', 'returns', 'extra'].includes(id)) state.products.forEach((p) => recalcRow(p.offer_id));
+          }
+        });
+        el.addEventListener('change', () => {
+          if (id === 'premium') schedule();
+          if (id === 'premium') state.products.forEach((p) => recalcRow(p.offer_id));
+        });
+      });
+      $('catComboBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if ($('catComboBtn').disabled) return;
+        if ($('catComboMenu').classList.contains('hidden')) openCatCombo();
+        else closeCatCombo();
+      });
+      $('catComboMenu').addEventListener('click', (e) => e.stopPropagation());
+      $('catComboSearch').addEventListener('input', (e) => renderCatComboList(e.target.value));
+      $('catComboSearch').addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeCatCombo();
+      });
+      document.addEventListener('click', (e) => {
+        if (!$('catCombo').contains(e.target)) closeCatCombo();
+      });
+      document.querySelectorAll('.scheme-btn').forEach((b) => b.addEventListener('click', () => setScheme(b.dataset.scheme)));
+      $('btnConnect').addEventListener('click', connect);
+    }
+
+    async function init() {
+      const cid = localStorage.getItem(LS_CID);
+      const key = localStorage.getItem(LS_KEY);
+      if (cid) $('clientId').value = cid;
+      if (key) $('apiKey').value = key;
+      state.tariff = defaultTariff(ceilL(30, 25, 8), 'FBO', 2490);
+      bind();
+      setScheme('FBO');
+      recalc();
+      await loadAssortment();
+      if (cid && key) await connect();
+      else schedule();
+    }
+    init();
+  })();
+  </script>
+
+</body>
+</html>
