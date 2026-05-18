@@ -247,40 +247,42 @@
       return { 'Client-Id': $('clientId').value.trim(), 'Api-Key': $('apiKey').value.trim(), 'Content-Type': 'application/json' };
     }
     async function apiPost(path, body) {
-      // Собираем данные, подтягивая ID и Secret из полей ввода калькулятора
       const payloadObj = {
         url: API + path,
-        clientId: document.getElementById('clientId').value.trim(), // Берем из поля Client-ID
-        apiKey: document.getElementById('apiKey').value.trim(),     // Берем из поля API-Key (Secret)
+        clientId: document.getElementById('clientId').value.trim(),
+        apiKey: document.getElementById('apiKey').value.trim(),
         body: body || {}
       };
 
-      return new Promise((resolve) => {
-        const callbackName = 'ozon_callback_' + Math.random().toString(36).substr(2, 9);
+      try {
+        const res = await fetch(CORS_PROXY, {
+          method: 'POST',
+          // Используем text/plain, чтобы браузер не делал лишних проверок preflight OPTIONS,
+          // которые часто ломают редиректы в Google Apps Script
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payloadObj)
+        });
+
+        const json = await res.json();
         
-        window[callbackName] = function(json) {
-          delete window[callbackName];
-          const el = document.getElementById(callbackName);
-          if (el) el.parentNode.removeChild(el);
-          
-          let data = {};
-          try { data = json.data ? JSON.parse(json.data) : {}; } catch { data = { raw: json.data }; }
-          const isOk = json.status >= 200 && json.status < 300;
-          if (isOk) state.apiOk = true;
-          resolve({ ok: isOk, status: json.status, data });
-        };
+        let responseData = {};
+        if (json && json.data) {
+          try {
+            responseData = JSON.parse(json.data);
+          } catch (e) {
+            responseData = { raw: json.data };
+          }
+        }
+
+        // Если Ozon вернул статус отличный от 2xx, передаем его код наружу
+        const isOk = json.status >= 200 && json.status < 300;
+        if (isOk) state.apiOk = true;
         
-        const script = document.createElement('script');
-        script.id = callbackName;
-        script.src = CORS_PROXY + '?callback=' + callbackName + '&payload=' + encodeURIComponent(JSON.stringify(payloadObj));
-        script.onerror = () => {
-          const el = document.getElementById(callbackName);
-          if (el) el.parentNode.removeChild(el);
-          state.corsBlocked = true;
-          resolve({ ok: false, status: 500, data: {} });
-        };
-        document.body.appendChild(script);
-      });
+        return { ok: isOk, status: json.status, data: responseData };
+      } catch (e) {
+        state.corsBlocked = true;
+        return { ok: false, status: 500, data: { raw: e.message } };
+      }
     }
 
     function defaultTariff(vol, scheme, price, customFboComm = null, customFbsComm = null) {
