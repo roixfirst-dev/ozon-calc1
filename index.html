@@ -249,7 +249,8 @@
     async function apiPost(path, body) {
       const opts = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Отправляем как простой текст, чтобы браузер не включал жесткие проверки CORS preflight
+        headers: { 'Content-Type': 'text/plain' }, 
         body: JSON.stringify({
           url: API + path,
           headers: headers(),
