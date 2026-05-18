@@ -796,14 +796,19 @@
         const { ok, status } = await apiPost('/v3/product/list', { "filter": { "visibility": "ALL" }, "limit": 10 });
         if (status === 401 || status === 403) { setStatus(false); showAuthError('Неверный Client-ID или API-Key'); return; }
         if (status === 500) { setStatus(false); showAuthError('Озон вернул 500. Проверьте Client-ID'); return; }
-        if (!ok) { setStatus(false); showAuthError('Ошибка API: ' + status); return; }
-        setStatus(true);
-        const tree = await apiPost('/v1/description-category/tree', { language: 'RU' });
-        if (tree.ok) {
-          state.categoryTypes = flattenOzonTypes(tree.data?.result || tree.data?.categories || [], [])
-            .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
-          initCategoryCombobox();
-        }
+        if (!ok) {
+  setStatus(false);
+  let errorMsg = 'Ошибка подключения. ';
+  if (data && data.raw) {
+    errorMsg += data.raw; // Покажет оригинальный текст ошибки от Ozon
+  } else if (typeof data === 'object') {
+    errorMsg += JSON.stringify(data);
+  } else {
+    errorMsg += 'Статус: ' + status;
+  }
+  showAuthError(errorMsg);
+  return;
+}
         await fetchTariff();
         recalc();
         await loadAssortment();
