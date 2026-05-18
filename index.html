@@ -247,31 +247,57 @@
       return { 'Client-Id': $('clientId').value.trim(), 'Api-Key': $('apiKey').value.trim(), 'Content-Type': 'application/json' };
     }
     async function apiPost(path, body) {
-      const opts = {
-        method: 'POST',
-        // Отправляем как простой текст, чтобы браузер не включал жесткие проверки CORS preflight
-        headers: { 'Content-Type': 'text/plain' }, 
-        body: JSON.stringify({
-          url: API + path,
-          headers: headers(),
-          body: body || {}
-        })
+      const payloadObj = {
+        url: API + path,
+        headers: headers(),
+        body: body || {}
       };
+
       try {
-        const res = await fetch(CORS_PROXY, opts);
+        // Попытка №1: Прямой текстовый запрос к Google Apps Script
+        const res = await fetch(CORS_PROXY, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payloadObj)
+        });
         const json = await res.json();
         
-        if (json.error) throw new Error(json.error);
-        
-        let data = {};
-        try { data = json.data ? JSON.parse(json.data) : {}; } catch { data = { raw: json.data }; }
-        
-        const isOk = json.status >= 200 && json.status < 300;
-        if (isOk) state.apiOk = true;
-        return { ok: isOk, status: json.status, data };
+        if (json && (json.status || json.data)) {
+          let data = {};
+          try { data = json.data ? JSON.parse(json.data) : {}; } catch { data = { raw: json.data }; }
+          const isOk = json.status >= 200 && json.status < 300;
+          if (isOk) state.apiOk = true;
+          return { ok: isOk, status: json.status, data };
+        }
+        throw new Error('CORS или редирект Google');
       } catch (e) {
-        state.corsBlocked = true;
-        throw e || new Error('Сеть недоступна');
+        // Попытка №2 (Железобетонная): Обход CORS через JSONP (динамический скрипт)
+        return new Promise((resolve) => {
+          const callbackName = 'ozon_callback_' + Math.random().toString(36).substr(2, 9);
+          
+          window[callbackName] = function(json) {
+            delete window[callbackName];
+            const el = document.getElementById(callbackName);
+            if (el) el.parentNode.removeChild(el);
+            
+            let data = {};
+            try { data = json.data ? JSON.parse(json.data) : {}; } catch { data = { raw: json.data }; }
+            const isOk = json.status >= 200 && json.status < 300;
+            if (isOk) state.apiOk = true;
+            resolve({ ok: isOk, status: json.status, data });
+          };
+          
+          const script = document.createElement('script');
+          script.id = callbackName;
+          script.src = CORS_PROXY + '?callback=' + callbackName + '&payload=' + encodeURIComponent(JSON.stringify(payloadObj));
+          script.onerror = () => {
+            const el = document.getElementById(callbackName);
+            if (el) el.parentNode.removeChild(el);
+            state.corsBlocked = true;
+            resolve({ ok: false, status: 500, data: {} });
+          };
+          document.body.appendChild(script);
+        });
       }
     }
 
