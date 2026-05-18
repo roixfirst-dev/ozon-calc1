@@ -190,7 +190,7 @@
     const LAST_MILE = 25;
     const $ = (id) => document.getElementById(id);
     
-    const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+    const CORS_PROXY = 'https://script.google.com/macros/s/AKfycbxiGu0ql2B8Hua4r6AmhE38CrteI0BbONZehlSaaIBG5M7G9bOkO46ClfRhT9ZaK_e7/exec';
 
     const state = {
       connected: false, scheme: 'FBO', categoryTypes: [], selectedType: null,
@@ -247,15 +247,27 @@
       return { 'Client-Id': $('clientId').value.trim(), 'Api-Key': $('apiKey').value.trim(), 'Content-Type': 'application/json' };
     }
     async function apiPost(path, body) {
-      const opts = { method: 'POST', headers: headers(), body: JSON.stringify(body || {}) };
-      const url = CORS_PROXY + encodeURIComponent(API + path);
+      const opts = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: API + path,
+          headers: headers(),
+          body: body || {}
+        })
+      };
       try {
-        const res = await fetch(url, opts);
-        const text = await res.text();
+        const res = await fetch(CORS_PROXY, opts);
+        const json = await res.json();
+        
+        if (json.error) throw new Error(json.error);
+        
         let data = {};
-        try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
-        if (res.ok) state.apiOk = true;
-        return { ok: res.ok, status: res.status, data, viaProxy: true };
+        try { data = json.data ? JSON.parse(json.data) : {}; } catch { data = { raw: json.data }; }
+        
+        const isOk = json.status >= 200 && json.status < 300;
+        if (isOk) state.apiOk = true;
+        return { ok: isOk, status: json.status, data };
       } catch (e) {
         state.corsBlocked = true;
         throw e || new Error('Сеть недоступна');
